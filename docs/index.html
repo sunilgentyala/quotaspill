@@ -5,14 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>QuotaSpill</title>
 <meta name="description" content="Keep a paid Claude/OpenAI coding agent running past its quota by spilling over to a free-tier backend only when the primary actually fails." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%235b8cff'/%3E%3Cpath d='M30 66 L50 30 L70 66 Z' fill='none' stroke='white' stroke-width='7' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='78' r='6' fill='white'/%3E%3C/svg%3E" />
 <style>
   :root {
     --bg: #0b0d10;
     --panel: #14171c;
+    --panel-2: #191d24;
     --border: #262b33;
     --text: #e6e8eb;
     --muted: #8b93a1;
     --primary: #5b8cff;
+    --primary-dim: #2b3a63;
     --fallback: #f5a623;
     --code-bg: #0f1216;
   }
@@ -20,9 +23,11 @@
     :root {
       --bg: #f7f8fa;
       --panel: #ffffff;
+      --panel-2: #f0f2f6;
       --border: #e3e6ea;
       --text: #14171c;
       --muted: #5b6270;
+      --primary-dim: #e4ebff;
       --code-bg: #f0f2f5;
     }
   }
@@ -33,16 +38,16 @@
     background: var(--bg);
     color: var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.55;
+    line-height: 1.6;
   }
-  main { max-width: 760px; margin: 0 auto; padding: 0 20px 80px; }
-  header.hero { max-width: 760px; margin: 0 auto; padding: 64px 20px 32px; }
-  h1 { font-size: 2rem; margin: 0 0 12px; letter-spacing: -0.02em; }
-  .tagline { color: var(--muted); font-size: 1.15rem; margin: 0 0 28px; max-width: 60ch; }
-  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  main { max-width: 780px; margin: 0 auto; padding: 0 20px 90px; }
+  header.hero { max-width: 780px; margin: 0 auto; padding: 68px 20px 12px; }
+  h1 { font-size: 2.2rem; margin: 0 0 14px; letter-spacing: -0.02em; }
+  .tagline { color: var(--muted); font-size: 1.18rem; margin: 0 0 28px; max-width: 58ch; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 40px; }
   .btn {
     display: inline-block;
-    padding: 10px 18px;
+    padding: 11px 20px;
     border-radius: 8px;
     text-decoration: none;
     font-weight: 600;
@@ -51,12 +56,37 @@
   }
   .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
   .btn.secondary { color: var(--text); }
-  h2 { font-size: 1.3rem; margin: 48px 0 12px; }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 0.82rem; margin-bottom: 18px; }
+  .badge-row span {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--panel);
+  }
+
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 20px;
+    margin: 8px 0 8px;
+  }
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  h2 { font-size: 1.35rem; margin: 56px 0 14px; letter-spacing: -0.01em; }
   p { color: var(--text); }
-  .badge-row { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
+  .lede { color: var(--muted); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 20px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .card .n { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+  .card .l { color: var(--muted); font-size: 0.88rem; margin-top: 4px; }
+
   table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--muted); font-weight: 600; }
+  td:last-child, th:last-child { color: var(--text); }
+
   pre {
     background: var(--code-bg);
     border: 1px solid var(--border);
@@ -66,6 +96,7 @@
     font-size: 0.85rem;
   }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
   .flow { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
   .flow-step {
     display: flex;
@@ -80,14 +111,17 @@
     flex-shrink: 0;
     width: 26px; height: 26px;
     border-radius: 50%;
-    background: var(--border);
+    background: var(--primary-dim);
+    color: var(--primary);
     display: flex; align-items: center; justify-content: center;
     font-size: 0.85rem; font-weight: 700;
   }
+
   .limits { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px 20px; }
   .limits li { margin: 12px 0; color: var(--text); }
+
   footer {
-    max-width: 760px; margin: 0 auto;
+    max-width: 780px; margin: 0 auto;
     padding: 32px 20px 60px;
     color: var(--muted); font-size: 0.85rem;
     border-top: 1px solid var(--border);
@@ -98,29 +132,74 @@
 <body>
 
 <header class="hero">
-  <div class="badge-row">Open source &middot; MIT &middot; zero npm dependencies</div>
-  <h1>QuotaSpill</h1>
-  <p class="tagline">Keep your paid Claude or OpenAI-powered coding agent running when its quota runs out, by spilling over to a free-tier backend only when the real subscription actually fails.</p>
+  <div class="badge-row">
+    <span>MIT licensed</span>
+    <span>Zero npm dependencies</span>
+    <span>Node &ge; 20</span>
+  </div>
+  <h1>Your paid AI coding agent shouldn't go dead the moment you hit a rate limit.</h1>
+  <p class="tagline">QuotaSpill is a self-hosted proxy that keeps your real, paid Claude or OpenAI subscription as the primary route, and only spills over to a free-tier backup when the primary genuinely runs out of quota. Never before.</p>
   <div class="cta">
     <a class="btn primary" href="https://github.com/sunilgentyala/quotaspill">View on GitHub</a>
-    <a class="btn secondary" href="#how-it-works">How it works</a>
+    <a class="btn secondary" href="#how-it-works">See how it works</a>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Request flow: coding agent to QuotaSpill, then to a paid primary provider, or a free fallback on quota error">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+        </marker>
+      </defs>
+      <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="14">
+        <rect x="10" y="85" width="140" height="40" rx="8" fill="var(--panel-2)" stroke="var(--border)"></rect>
+        <text x="80" y="110" text-anchor="middle" fill="var(--text)">Coding agent</text>
+
+        <line x1="150" y1="105" x2="215" y2="105" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+
+        <rect x="220" y="85" width="140" height="40" rx="8" fill="var(--primary-dim)" stroke="var(--primary)"></rect>
+        <text x="290" y="110" text-anchor="middle" fill="var(--text)" font-weight="600">QuotaSpill</text>
+
+        <line x1="360" y1="95" x2="420" y2="45" stroke="var(--primary)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="392" y="65" fill="var(--primary)" font-size="12">healthy</text>
+
+        <line x1="360" y1="115" x2="420" y2="165" stroke="var(--fallback)" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="382" y="150" fill="var(--fallback)" font-size="12">429 / 529 / cap</text>
+
+        <rect x="425" y="20" width="285" height="50" rx="8" fill="var(--panel-2)" stroke="var(--primary)"></rect>
+        <text x="567" y="41" text-anchor="middle" fill="var(--text)" font-weight="600">Primary (your paid plan)</text>
+        <text x="567" y="58" text-anchor="middle" fill="var(--muted)" font-size="11.5">real answer, real tokens billed</text>
+
+        <rect x="425" y="145" width="285" height="50" rx="8" fill="var(--panel-2)" stroke="var(--fallback)"></rect>
+        <text x="567" y="166" text-anchor="middle" fill="var(--text)" font-weight="600">Fallback (free tier)</text>
+        <text x="567" y="183" text-anchor="middle" fill="var(--muted)" font-size="11.5">answer keeps flowing, clearly labeled</text>
+      </g>
+    </svg>
   </div>
 </header>
 
 <main>
-  <h2>The gap this fills</h2>
-  <p>Free-tier LLM routers like freellmapi, OpenRouter, and LiteLLM's public routing all solve the same problem: stack a pile of free-tier accounts behind one endpoint and route across them. None of them solve the opposite problem for a developer who already pays for Claude or OpenAI: staying online when a rate limit or monthly cap hits mid-task.</p>
-  <p>QuotaSpill flips the priority. Your <strong>real, paid</strong> provider is always tried first. A free-tier fallback, which can be a single provider or a whole local aggregator, only takes over when the primary actually returns a quota error, or when a budget cap you configured is reached. Nothing is silently masked: a bad request or bad API key is relayed to you exactly as the primary sent it.</p>
+  <h2>Why this exists</h2>
+  <p>Every free-tier router on the market solves the same problem: stack a pile of free-tier accounts behind one endpoint and route across whichever one is healthiest right now. That's useful, but it inverts the priority for anyone who actually pays for Claude or OpenAI. If you already have a subscription, the model you want most of the time is the one you're paying for, not the cheapest one available.</p>
+  <p>QuotaSpill exists for the other half of that problem: <strong>stay online past your own quota, without giving up your paid model the rest of the time.</strong> Your real, paid provider is always tried first. A free-tier fallback only takes over when the primary actually returns a quota error, or when a budget cap you configured is reached. Nothing is silently masked: a bad request or bad API key is relayed to you exactly as the primary sent it.</p>
 
-  <h2>How it compares</h2>
+  <div class="cards">
+    <div class="card"><div class="n">0</div><div class="l">npm dependencies</div></div>
+    <div class="card"><div class="n">2</div><div class="l">wire formats supported natively</div></div>
+    <div class="card"><div class="n">9/9</div><div class="l">tests passing against real HTTP servers</div></div>
+    <div class="card"><div class="n">MIT</div><div class="l">license, fully open source</div></div>
+  </div>
+
+  <h2>What makes this different</h2>
+  <p class="lede">Most self-hosted LLM routers are built around a catalog: they track dozens of providers and route to whichever free model scores best. QuotaSpill inverts that model entirely instead of extending it.</p>
   <table>
-    <tr><th></th><th>freellmapi</th><th>QuotaSpill</th></tr>
-    <tr><td>What's primary</td><td>Best-scoring free model right now</td><td>Your real paid subscription</td></tr>
-    <tr><td>Fails over when</td><td>Any provider hits its free cap</td><td>Primary returns a quota error, or your budget cap is hit</td></tr>
-    <tr><td>Provider catalog</td><td>34+ providers tracked for you</td><td>None &mdash; you wire 2&ndash;3 endpoints yourself</td></tr>
-    <tr><td>Footprint</td><td>Full app: dashboard, SQLite, Docker image</td><td>One Node process, zero dependencies</td></tr>
+    <tr><th></th><th>Typical free-tier router</th><th>QuotaSpill</th></tr>
+    <tr><td>What's primary</td><td>Whichever free model scores best right now</td><td>Your real paid subscription</td></tr>
+    <tr><td>Fails over when</td><td>Any provider hits its own cap</td><td>Your primary returns a quota error, or your budget cap is hit</td></tr>
+    <tr><td>Provider catalog</td><td>Dozens of providers tracked for you</td><td>None &mdash; you wire up 2&ndash;3 endpoints yourself</td></tr>
+    <tr><td>Footprint</td><td>Full app: dashboard, database, container image</td><td>One Node process, zero dependencies</td></tr>
   </table>
-  <p>They pair well together: point QuotaSpill's fallback at a local freellmapi instance, and your paid quota keeps resetting untouched while freellmapi's free-tier catalog absorbs the overflow.</p>
+  <p>Nothing stops you from pointing QuotaSpill's fallback at whatever free-tier backend you already run locally; it just doesn't assume one, ship one, or depend on one. That's what keeps it small enough to read end to end in one sitting.</p>
 
   <h2 id="how-it-works">How it works</h2>
   <div class="flow">
@@ -136,7 +215,7 @@
 cd quotaspill
 cp quotaspill.config.example.json quotaspill.config.json
 cp .env.example .env
-# edit .env: set ANTHROPIC_API_KEY / OPENAI_API_KEY, and FREELLMAPI_KEY
+# edit .env: set ANTHROPIC_API_KEY / OPENAI_API_KEY, and FALLBACK_API_KEY
 
 node --env-file=.env bin/quotaspill.js start
 # dashboard: http://localhost:8787</code></pre>
@@ -147,7 +226,7 @@ node --env-file=.env bin/quotaspill.js start
     <li><strong>Doesn't extend your real quota.</strong> The fallback answers with a different, usually weaker model. It keeps your agent's session alive, not your subscription's token count.</li>
     <li><strong>Budget caps count requests, not tokens</strong>, since that's the metering unit QuotaSpill controls directly.</li>
     <li><strong>Mid-stream drops aren't recoverable</strong> once the primary has already started streaming a 200 response.</li>
-    <li><strong>Single-user, no auth of its own.</strong> Meant for <code>localhost</code>, like the fallback services it typically points at.</li>
+    <li><strong>Single-user, no auth of its own.</strong> Meant for <code>localhost</code>, like any self-hosted proxy of this kind.</li>
   </ul>
 
   <h2>License</h2>

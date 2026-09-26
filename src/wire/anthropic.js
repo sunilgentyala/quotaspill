@@ -1,5 +1,5 @@
 // Wire adapter for Anthropic's Messages API (/v1/messages), also spoken by
-// several OpenAI-compatible routers (including freellmapi) in Anthropic mode.
+// several self-hosted routers that offer an Anthropic-compatible mode.
 
 export const path = '/v1/messages';
 

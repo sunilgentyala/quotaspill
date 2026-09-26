@@ -1,6 +1,6 @@
 // Wire adapter for the OpenAI Chat Completions API (/v1/chat/completions),
 // the surface most coding agents (Cursor, aider, Cline, Continue) speak, and
-// what freellmapi and most free-tier routers expose natively.
+// what most free-tier routers expose natively.
 
 export const path = '/v1/chat/completions';
 

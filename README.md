@@ -1,33 +1,56 @@
+<div align="center">
+
 # QuotaSpill
 
-**Keep your paid Claude/OpenAI-compatible coding agent running when your subscription quota runs out, by spilling over to a free-tier backend only when the primary actually fails.**
+**Your paid AI coding agent shouldn't go dead the moment you hit a rate limit.**
+
+A zero-dependency proxy that keeps your real, paid Claude or OpenAI subscription as the primary route, and only spills over to a free-tier backup when the primary genuinely runs out of quota, never before.
 
 [![CI](https://github.com/sunilgentyala/quotaspill/actions/workflows/ci.yml/badge.svg)](https://github.com/sunilgentyala/quotaspill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+[![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](./package.json)
+[![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933.svg)](./package.json)
+
+</div>
+
+```
+  your coding agent
+         │
+         ▼
+   ┌───────────┐   healthy   ┌──────────────────┐
+   │ QuotaSpill │───────────▶│  primary (paid)   │──▶ real answer, real tokens
+   └───────────┘             └──────────────────┘
+         │
+         │  429 / 529 / cap reached
+         ▼
+   ┌──────────────────┐
+   │ fallback (free)   │──▶ answer keeps flowing, labeled X-QuotaSpill-Source
+   └──────────────────┘
+```
 
 ## Why this exists
 
-Free-tier LLM routers (freellmapi, OpenRouter, LiteLLM's public routing) all solve the same problem: stack a bunch of free-tier accounts behind one endpoint and route across them. None of them solve the opposite, more common problem for a paying developer: **you already pay for Claude or OpenAI, you just don't want your coding agent to go dead the moment you hit a rate limit or burn through a monthly cap.**
+Every free-tier router on the market solves the same problem: stack a pile of free-tier accounts behind one endpoint and route across whichever one is healthiest right now. That's useful, but it inverts the priority for anyone who actually *pays* for Claude or OpenAI. If you already have a subscription, the model you want most of the time is the one you're paying for, not the cheapest one available.
 
-QuotaSpill is not another free-tier aggregator. It is a thin proxy that:
+QuotaSpill exists for the other half of that problem: **stay online past your own quota, without giving up your paid model the rest of the time.** It is a thin proxy that:
 
 1. Always tries your **real, paid** provider first.
-2. Only fails over to a **free-tier fallback** (which can be a single free provider, or a whole aggregator like [freellmapi](https://github.com/tashfeenahmed/freellmapi) running locally) when the primary actually returns a quota/rate-limit error, or when you've configured a monthly request budget and hit it.
+2. Only fails over to a **free-tier fallback** when the primary actually returns a quota/rate-limit error, or when you've configured a monthly request budget and hit it.
 3. Never silently masks a real error. A bad request or an invalid API key is relayed to you as-is; only quota exhaustion triggers failover.
 4. Labels every response with `X-QuotaSpill-Source: primary:<name>` or `fallback:<name>`, and tracks the split (plus estimated dollars saved) on a local dashboard.
 
-## How it's different from freellmapi
+## What makes this different
 
-They compose well together rather than compete:
+Most self-hosted LLM routers are built around a catalog: they track dozens of providers and route to whichever free model scores best. QuotaSpill inverts that model entirely instead of extending it:
 
-| | freellmapi | QuotaSpill |
+| | Typical free-tier router | QuotaSpill |
 |---|---|---|
-| What's "primary" | Whichever free-tier model scores best right now | Your real paid subscription/API key |
-| When it fails over | Any provider hits its free-tier cap | Only when the primary returns a quota error, or your own budget cap is hit |
-| Catalog | Tracks 34+ providers, hundreds of models | None. You configure 2-3 endpoints yourself |
-| Dependencies | Full app: React dashboard, SQLite, Docker image | Zero npm dependencies, one Node process |
+| What's "primary" | Whichever free model scores best right now | Your real paid subscription |
+| When it fails over | Any provider hits its own cap | Only when *your* primary returns a quota error, or *your* budget cap is hit |
+| Provider catalog | Tracks dozens of providers for you | None. You wire up 2-3 endpoints yourself |
+| Footprint | Full app: dashboard, database, container image | One Node process, zero npm dependencies |
 
-A natural pairing: point QuotaSpill's fallback at a local freellmapi instance, so when your paid Claude quota runs out mid-task, QuotaSpill spills over to whatever free model freellmapi currently has healthy, and your paid quota keeps resetting for next month untouched.
+Nothing stops you from pointing QuotaSpill's fallback at whatever free-tier backend you already run locally; it just doesn't assume one, ship one, or depend on one. That's what keeps it small enough to read end to end in one sitting.
 
 ## Quick start
 
@@ -36,8 +59,8 @@ git clone https://github.com/sunilgentyala/quotaspill.git
 cd quotaspill
 cp quotaspill.config.example.json quotaspill.config.json
 cp .env.example .env
-# edit .env: set ANTHROPIC_API_KEY and/or OPENAI_API_KEY, and FREELLMAPI_KEY
-# edit quotaspill.config.json if your fallback isn't at localhost:3001
+# edit .env: set ANTHROPIC_API_KEY and/or OPENAI_API_KEY, and FALLBACK_API_KEY
+# edit quotaspill.config.json to point at whatever fallback backend you're running
 
 node --env-file=.env bin/quotaspill.js start
 ```
@@ -57,7 +80,7 @@ Open `http://localhost:8787` for the dashboard. Point your coding agent's base U
   "chains": {
     "anthropic": [
       { "name": "anthropic-real", "kind": "primary", "baseUrl": "https://api.anthropic.com", "apiKey": "env:ANTHROPIC_API_KEY" },
-      { "name": "freellmapi-local", "kind": "fallback", "baseUrl": "http://localhost:3001", "apiKey": "env:FREELLMAPI_KEY" }
+      { "name": "local-fallback", "kind": "fallback", "baseUrl": "http://localhost:3001", "apiKey": "env:FALLBACK_API_KEY" }
     ]
   },
   "budget": {
@@ -74,12 +97,12 @@ Open `http://localhost:8787` for the dashboard. Point your coding agent's base U
 - `budget.<chain>.monthlyRequestCap` is optional. When set, QuotaSpill routes straight to the fallback chain once that many requests have been served this calendar month, without even trying the primary, so you don't burn a rate-limit response on a request you know will fail.
 - `pricing.<chain>` is optional and only used to estimate dollars saved on the dashboard: it prices fallback-served tokens at what your primary would have charged.
 
-## Adding your own provider keys
+## Adding your own fallback
 
-QuotaSpill doesn't ship a provider catalog; you tell it what to call. Any fallback needs to speak the same wire format as the chain it's in:
+QuotaSpill doesn't ship a provider catalog; you tell it what to call. A fallback just needs to speak the same wire format as the chain it's in:
 
-- **Anthropic chain**: the fallback must expose an Anthropic-compatible `/v1/messages` endpoint. freellmapi does this natively.
-- **OpenAI chain**: the fallback must expose an OpenAI-compatible `/v1/chat/completions` endpoint. Most free-tier routers (freellmapi, OpenRouter, Groq, Cerebras direct) do.
+- **Anthropic chain**: the fallback must expose an Anthropic-compatible `/v1/messages` endpoint.
+- **OpenAI chain**: the fallback must expose an OpenAI-compatible `/v1/chat/completions` endpoint, which is the surface most free-tier routers and direct providers (Groq, Cerebras, etc.) already speak.
 
 There's no cross-format translation in this version; see Limitations.
 
@@ -99,7 +122,7 @@ Read this before depending on it for real work:
 - **A monthly request cap is a request count, not a token count.** Providers meter quota in tokens, not requests, so a cap here is a coarse proxy, not a precise budget guardrail.
 - **Mid-stream failure isn't recoverable.** If the primary returns a normal `200` and starts streaming, then the connection drops partway through, QuotaSpill can't retroactively fail over. Failover only works for errors that arrive before any bytes are streamed, which is how virtually all real rate-limit/quota errors behave, but it's a real edge case.
 - **This does not get you more Claude tokens.** When the primary is exhausted, the fallback answers with a different, usually weaker model. It keeps your agent's session alive; it doesn't extend your actual subscription.
-- **Single-process, no auth of its own.** Like freellmapi, this is meant to run on `localhost` for one person. It has no login and no rate limiting of its own; don't expose it to a network you don't trust.
+- **Single-process, no auth of its own.** This is meant to run on `localhost` for one person. It has no login and no rate limiting of its own; don't expose it to a network you don't trust.
 - **A real Anthropic API key is not the same thing as a Claude subscription login.** `claude login` (Pro/Max) doesn't produce an API key you can point a raw HTTP client at; you need a separate pay-as-you-go key from the Anthropic Console for the "primary" side of an Anthropic chain.
 
 ## Development

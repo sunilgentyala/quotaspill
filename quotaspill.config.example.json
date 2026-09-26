@@ -10,10 +10,10 @@
         "apiKey": "env:ANTHROPIC_API_KEY"
       },
       {
-        "name": "freellmapi-local",
+        "name": "local-fallback",
         "kind": "fallback",
         "baseUrl": "http://localhost:3001",
-        "apiKey": "env:FREELLMAPI_KEY"
+        "apiKey": "env:FALLBACK_API_KEY"
       }
     ],
     "openai": [
@@ -24,10 +24,10 @@
         "apiKey": "env:OPENAI_API_KEY"
       },
       {
-        "name": "freellmapi-local",
+        "name": "local-fallback",
         "kind": "fallback",
         "baseUrl": "http://localhost:3001",
-        "apiKey": "env:FREELLMAPI_KEY"
+        "apiKey": "env:FALLBACK_API_KEY"
       }
     ]
   },
