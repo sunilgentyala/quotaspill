@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuotaSpill</title>
+<meta name="description" content="Keep a paid Claude/OpenAI coding agent running past its quota by spilling over to a free-tier backend only when the primary actually fails." />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --border: #262b33;
+    --text: #e6e8eb;
+    --muted: #8b93a1;
+    --primary: #5b8cff;
+    --fallback: #f5a623;
+    --code-bg: #0f1216;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --border: #e3e6ea;
+      --text: #14171c;
+      --muted: #5b6270;
+      --code-bg: #f0f2f5;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 0 20px 80px; }
+  header.hero { max-width: 760px; margin: 0 auto; padding: 64px 20px 32px; }
+  h1 { font-size: 2rem; margin: 0 0 12px; letter-spacing: -0.02em; }
+  .tagline { color: var(--muted); font-size: 1.15rem; margin: 0 0 28px; max-width: 60ch; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: 10px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: 1px solid var(--border);
+  }
+  .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .btn.secondary { color: var(--text); }
+  h2 { font-size: 1.3rem; margin: 48px 0 12px; }
+  p { color: var(--text); }
+  .badge-row { color: var(--muted); font-size: 0.9rem; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-x: auto;
+    font-size: 0.85rem;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .flow { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+  .flow-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .flow-step .n {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700;
+  }
+  .limits { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px 20px; }
+  .limits li { margin: 12px 0; color: var(--text); }
+  footer {
+    max-width: 760px; margin: 0 auto;
+    padding: 32px 20px 60px;
+    color: var(--muted); font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="badge-row">Open source &middot; MIT &middot; zero npm dependencies</div>
+  <h1>QuotaSpill</h1>
+  <p class="tagline">Keep your paid Claude or OpenAI-powered coding agent running when its quota runs out, by spilling over to a free-tier backend only when the real subscription actually fails.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/sunilgentyala/quotaspill">View on GitHub</a>
+    <a class="btn secondary" href="#how-it-works">How it works</a>
+  </div>
+</header>
+
+<main>
+  <h2>The gap this fills</h2>
+  <p>Free-tier LLM routers like freellmapi, OpenRouter, and LiteLLM's public routing all solve the same problem: stack a pile of free-tier accounts behind one endpoint and route across them. None of them solve the opposite problem for a developer who already pays for Claude or OpenAI: staying online when a rate limit or monthly cap hits mid-task.</p>
+  <p>QuotaSpill flips the priority. Your <strong>real, paid</strong> provider is always tried first. A free-tier fallback, which can be a single provider or a whole local aggregator, only takes over when the primary actually returns a quota error, or when a budget cap you configured is reached. Nothing is silently masked: a bad request or bad API key is relayed to you exactly as the primary sent it.</p>
+
+  <h2>How it compares</h2>
+  <table>
+    <tr><th></th><th>freellmapi</th><th>QuotaSpill</th></tr>
+    <tr><td>What's primary</td><td>Best-scoring free model right now</td><td>Your real paid subscription</td></tr>
+    <tr><td>Fails over when</td><td>Any provider hits its free cap</td><td>Primary returns a quota error, or your budget cap is hit</td></tr>
+    <tr><td>Provider catalog</td><td>34+ providers tracked for you</td><td>None &mdash; you wire 2&ndash;3 endpoints yourself</td></tr>
+    <tr><td>Footprint</td><td>Full app: dashboard, SQLite, Docker image</td><td>One Node process, zero dependencies</td></tr>
+  </table>
+  <p>They pair well together: point QuotaSpill's fallback at a local freellmapi instance, and your paid quota keeps resetting untouched while freellmapi's free-tier catalog absorbs the overflow.</p>
+
+  <h2 id="how-it-works">How it works</h2>
+  <div class="flow">
+    <div class="flow-step"><span class="n">1</span><span>Request lands on <code>/v1/messages</code> (Anthropic wire) or <code>/v1/chat/completions</code> (OpenAI wire).</span></div>
+    <div class="flow-step"><span class="n">2</span><span>If a monthly budget cap is already spent, skip straight to the fallback chain.</span></div>
+    <div class="flow-step"><span class="n">3</span><span>Otherwise call the primary. A 429/529 quota-style error moves to the next provider; anything else (400, 401, 403&hellip;) is relayed to you immediately, unmodified.</span></div>
+    <div class="flow-step"><span class="n">4</span><span>Streaming responses are piped through byte-for-byte; usage tokens are parsed off the SSE stream on the side, so the dashboard's savings estimate works for streamed answers too.</span></div>
+    <div class="flow-step"><span class="n">5</span><span>Every response carries <code>X-QuotaSpill-Source: primary:&lt;name&gt;</code> or <code>fallback:&lt;name&gt;</code>, and a local dashboard tracks the split.</span></div>
+  </div>
+
+  <h2>Quick start</h2>
+  <pre><code>git clone https://github.com/sunilgentyala/quotaspill.git
+cd quotaspill
+cp quotaspill.config.example.json quotaspill.config.json
+cp .env.example .env
+# edit .env: set ANTHROPIC_API_KEY / OPENAI_API_KEY, and FREELLMAPI_KEY
+
+node --env-file=.env bin/quotaspill.js start
+# dashboard: http://localhost:8787</code></pre>
+
+  <h2>Honest limitations</h2>
+  <ul class="limits">
+    <li><strong>No cross-wire translation.</strong> A chain's primary and fallback must speak the same API shape; Anthropic-to-OpenAI translation isn't implemented.</li>
+    <li><strong>Doesn't extend your real quota.</strong> The fallback answers with a different, usually weaker model. It keeps your agent's session alive, not your subscription's token count.</li>
+    <li><strong>Budget caps count requests, not tokens</strong>, since that's the metering unit QuotaSpill controls directly.</li>
+    <li><strong>Mid-stream drops aren't recoverable</strong> once the primary has already started streaming a 200 response.</li>
+    <li><strong>Single-user, no auth of its own.</strong> Meant for <code>localhost</code>, like the fallback services it typically points at.</li>
+  </ul>
+
+  <h2>License</h2>
+  <p>MIT. See the <a href="https://github.com/sunilgentyala/quotaspill/blob/main/README.md">full README</a> for configuration reference and development notes.</p>
+</main>
+
+<footer>
+  <a href="https://github.com/sunilgentyala/quotaspill">github.com/sunilgentyala/quotaspill</a> &middot; by Sunil Gentyala
+</footer>
+
+</body>
+</html>
