@@ -128,7 +128,7 @@ Read this before depending on it for real work:
 ## Development
 
 ```bash
-npm test        # node --test test/, zero dependencies, zero build step
+npm test        # node --test test/*.test.js, zero dependencies, zero build step
 ```
 
 Every test in `test/proxy.test.js` runs against real throwaway HTTP servers standing in for the primary and fallback providers (not hand-rolled mocks of the fetch API), so the actual network and streaming code paths are exercised.
