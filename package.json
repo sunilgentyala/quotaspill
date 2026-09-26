@@ -1,0 +1,34 @@
+{
+  "name": "quotaspill",
+  "version": "0.1.0",
+  "description": "Keep your paid Claude/OpenAI-compatible coding agent running past its quota by spilling over to a free-tier backend only when the primary actually fails.",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": {
+    "quotaspill": "bin/quotaspill.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bin/quotaspill.js start",
+    "test": "node --test test/"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sunilgentyala/quotaspill.git"
+  },
+  "keywords": [
+    "llm",
+    "proxy",
+    "failover",
+    "claude",
+    "openai",
+    "anthropic",
+    "rate-limit",
+    "coding-agent"
+  ],
+  "author": "Sunil Gentyala",
+  "dependencies": {}
+}

@@ -1,0 +1,42 @@
+{
+  "port": 8787,
+  "statsFile": ".quotaspill-stats.json",
+  "chains": {
+    "anthropic": [
+      {
+        "name": "anthropic-real",
+        "kind": "primary",
+        "baseUrl": "https://api.anthropic.com",
+        "apiKey": "env:ANTHROPIC_API_KEY"
+      },
+      {
+        "name": "freellmapi-local",
+        "kind": "fallback",
+        "baseUrl": "http://localhost:3001",
+        "apiKey": "env:FREELLMAPI_KEY"
+      }
+    ],
+    "openai": [
+      {
+        "name": "openai-real",
+        "kind": "primary",
+        "baseUrl": "https://api.openai.com",
+        "apiKey": "env:OPENAI_API_KEY"
+      },
+      {
+        "name": "freellmapi-local",
+        "kind": "fallback",
+        "baseUrl": "http://localhost:3001",
+        "apiKey": "env:FREELLMAPI_KEY"
+      }
+    ]
+  },
+  "budget": {
+    "anthropic": { "monthlyRequestCap": null },
+    "openai": { "monthlyRequestCap": null }
+  },
+  "pricing": {
+    "anthropic": { "inputPer1M": 3, "outputPer1M": 15 },
+    "openai": { "inputPer1M": 2.5, "outputPer1M": 10 }
+  }
+}

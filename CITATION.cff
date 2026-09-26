@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "QuotaSpill: Paid-First, Free-Fallback LLM Request Routing"
+authors:
+  - family-names: Gentyala
+    given-names: Sunil
+repository-code: "https://github.com/sunilgentyala/quotaspill"
+license: MIT
+version: 0.1.0
+date-released: 2026-09-26

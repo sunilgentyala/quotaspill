@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuotaSpill</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --border: #262b33;
+    --text: #e6e8eb;
+    --muted: #8b93a1;
+    --primary: #5b8cff;
+    --fallback: #f5a623;
+    --ok: #34c759;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --border: #e3e6ea;
+      --text: #14171c;
+      --muted: #5b6270;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  main { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+  .chain {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .chain h2 { margin: 0 0 4px; font-size: 1.1rem; text-transform: capitalize; }
+  .cap-note { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+  .cap-note.reached { color: var(--fallback); }
+  .bar {
+    height: 10px;
+    border-radius: 6px;
+    background: var(--border);
+    overflow: hidden;
+    display: flex;
+    margin-bottom: 16px;
+  }
+  .bar .primary { background: var(--primary); }
+  .bar .fallback { background: var(--fallback); }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .stat { }
+  .stat .value { font-size: 1.3rem; font-weight: 600; }
+  .stat .label { color: var(--muted); font-size: 0.8rem; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>QuotaSpill</h1>
+  <div class="sub">Paid-first, free-fallback LLM routing. Refreshes every 5s.</div>
+  <div id="chains"></div>
+  <footer>
+    <a href="https://github.com/sunilgentyala/quotaspill" target="_blank" rel="noopener">github.com/sunilgentyala/quotaspill</a>
+  </footer>
+</main>
+<script>
+  function fmtNum(n) {
+    return new Intl.NumberFormat().format(n || 0);
+  }
+
+  async function refresh() {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    const container = document.getElementById('chains');
+    const names = Object.keys(data.chains || {});
+
+    if (names.length === 0) {
+      container.innerHTML = '<div class="empty">No chains configured yet.</div>';
+      return;
+    }
+
+    container.innerHTML = names.map((name) => {
+      const c = data.chains[name];
+      const bySource = c.allTime.bySource || {};
+      const primaryCount = bySource[c.primaryName] || 0;
+      const fallbackCount = c.allTime.requests - primaryCount;
+      const total = c.allTime.requests || 1;
+      const primaryPct = Math.round((primaryCount / total) * 100);
+      const fallbackPct = 100 - primaryPct;
+      const capLine = c.monthlyRequestCap != null
+        ? \`Monthly budget: \${fmtNum(c.monthRequests)} / \${fmtNum(c.monthlyRequestCap)} requests\${c.capReached ? ' (cap reached, routing straight to fallback)' : ''}\`
+        : 'No monthly budget cap configured';
+
+      return \`
+        <div class="chain">
+          <h2>\${name}</h2>
+          <div class="cap-note\${c.capReached ? ' reached' : ''}">\${capLine}</div>
+          <div class="bar">
+            <div class="primary" style="width:\${primaryPct}%"></div>
+            <div class="fallback" style="width:\${fallbackPct}%"></div>
+          </div>
+          <div class="stats-grid">
+            <div class="stat"><div class="value">\${fmtNum(c.allTime.requests)}</div><div class="label">Total requests</div></div>
+            <div class="stat"><div class="value">\${fmtNum(primaryCount)}</div><div class="label">Served by primary</div></div>
+            <div class="stat"><div class="value">\${fmtNum(fallbackCount)}</div><div class="label">Spilled to fallback</div></div>
+            <div class="stat"><div class="value">\${c.estimatedSavedUsd != null ? '$' + c.estimatedSavedUsd.toFixed(2) : 'n/a'}</div><div class="label">Est. saved</div></div>
+          </div>
+        </div>
+      \`;
+    }).join('');
+  }
+
+  refresh();
+  setInterval(refresh, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.local
+quotaspill.config.json
+.quotaspill-stats.json
+*.log
+.DS_Store
